@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
+<title>Hakone Player</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.1/css/fontawesome.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.39.0/css/tempusdominus-bootstrap-4.min.css" />
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.84/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<style type="text/css">
+
+@import url("https://cesium.com/downloads/cesiumjs/releases/1.84/Build/Cesium/Widgets/widgets.css");
+
+body {
+  margin: 0; padding: 0; overflow: hidden;
+}
+#map {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  margin: 0; padding: 0; overflow: hidden;
+}
+#top-bar {
+  position: absolute;
+  top: 5px; left: 5px;
+}
+#top-right-bar {
+  position: absolute;
+  top: 5px; right: 5px;
+}
+#bottom-bar {
+  position: absolute;
+  bottom: 20px; left: 5px;
+}
+.bar-inliner {
+  display: inline-block;
+}
+
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="top-bar">
+  <div class="dropdown bar-inliner">
+    <button class="btn btn-primary dropdown-toggle" type="button" id="ddMB" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">地点</button>
+    <ul class="dropdown-menu">
+      <li><button class="dropdown-item" value="hakoneyumoto_sta">箱根湯本駅</button></li>
+      <li><button class="dropdown-item" value="oohiradai_sta">大平台駅</button></li>
+      <li><button class="dropdown-item" value="miyanoshita_sta">宮ノ下駅</button></li>
+      <li><button class="dropdown-item" value="gora_sta">強羅駅</button></li>
+      <li><button class="dropdown-item" value="sounzan_sta">早雲山駅</button></li>
+      <li><button class="dropdown-item" value="owakudani_sta">大涌谷駅</button></li>
+      <li><button class="dropdown-item" value="tougenda_sta">桃源台駅</button></li>
+      <li><button class="dropdown-item" value="motohakone">元箱根</button></li>
+      <li><button class="dropdown-item" value="daikanzan">大観山</button></li>
+      <li><button class="dropdown-item disabled"></button></li>
+      <li><button class="dropdown-item" value="ropeway">箱根ロープウェイ</button></li>
+    </ul>
+  </div>
+  <button id="resetCameraButton" type="button" class="btn btn-secondary">リセット</button>
+</div>
+<div id="top-right-bar">
+  <div id="navigationHelpButtonContainer"></div>
+</div>
+<div id="bottom-bar">
+  <div class="bar-inliner">
+    <div class="form-group">
+      <div class='input-group date' id='datetimepicker' data-target-input="nearest">
+        <input type="text" class="form-control datetimepicker-input" data-target="#datetimepicker" data-toggle="tooltip" title="表示中の日時"/>
+        <div class="input-group-append" data-target="#datetimepicker" data-toggle="datetimepicker">
+          <div class="input-group-text" data-toggle="tooltip" title="日時設定"><i class="fa fa-calendar"></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bar-inliner">
+    <button id="stopButton" type="button" class="btn btn-secondary player" data-toggle="tooltip" title="時間停止">
+      <i class="fas fa-stop"></i>
+    </button>
+    <button id="playButton" type="button" class="btn btn-primary player" data-toggle="tooltip" title="通常再生">
+      <i class="fas fa-play"></i>
+    </button>
+    <button id="forwardButton1" type="button" class="btn btn-secondary player" data-toggle="tooltip" title="早送り(5倍速)">
+      <i class="fas fa-forward">1</i>
+    </button>
+    <button id="forwardButton2" type="button" class="btn btn-secondary player" data-toggle="tooltip" title="早送り(60倍速)">
+      <i class="fas fa-forward">2</i>
+    </button>
+    <button id="forwardButton3" type="button" class="btn btn-secondary player" data-toggle="tooltip" title="早送り(3600倍速)">
+      <i class="fas fa-forward">3</i>
+    </button>
+  </div>
+  <script src="https://code.jquery.com/jquery-3.6.1.slim.min.js" integrity="sha256-w8CvhFs7iHNVUtnSP0YKEg00p9Ih13rlL9zGqvLdePA=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.9.2/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.39.0/js/tempusdominus-bootstrap-4.min.js"></script>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.84/Build/Cesium/Cesium.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>
