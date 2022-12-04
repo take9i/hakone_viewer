@@ -1,37 +1,10 @@
-"use strict";
-
-const tail = (ar, i = -1) => ar[ar.length + i];
-const flatten = nested => Array.prototype.concat.apply([], nested);
-function zip() {
-  const args = [].slice.call(arguments);
-  return args[0].map((_, i) => args.map(arg => arg[i]));
-}
-function fetch(url) {
-  return new Promise((resolve, reject) => {
-    const req = new XMLHttpRequest();
-    req.open("GET", url);
-    req.onload = () => {
-      if (req.status == 200) {
-        resolve(req.response);
-      } else {
-        reject(new Error(req.statusText));
-      }
-    };
-    req.onerror = () => {
-      reject(new Error("Network Error"));
-    };
-    req.send();
-  });
-}
-function getJSON(url) {
-  return fetch(url).then(JSON.parse);
-}
+const getJSON = (url) => fetch(url).then((response) => response.json());
 
 // ---
 
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/jp-mierune-streets/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
-const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
-// const MAPTILE_URL = './data/_maptiles/{z}/{x}/{y}.png'
+// const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
+const MAPTILE_URL = './data/_maptiles/{z}/{x}/{y}.png'
 
 const TILESET_FEATURES_URL = './data/3dtiles/14382_hakone-machi_building/bldg_notexture/tileset.json'
 const CAMERA_DESTINATION = Cesium.Cartesian3.fromDegrees(139.103528, 35.233333, 400)
@@ -40,9 +13,7 @@ const CAMERA_DESTINATION = Cesium.Cartesian3.fromDegrees(139.103528, 35.233333, 
 Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UyMjcwOS00MDY1LTQxYjEtYjZjMy00YTU0ZTg5MmViYWQiLCJpZCI6ODAzMDYsImlhdCI6MTY0Mjc0ODI2MX0.dkwAL1CcljUV7NA7fDbhXXnmyZQU_c-G5zRx8PtEcxE';
 
 let viewer;
-(function() {
-  let fireworks = null;
-
+(() => {
   const presetCameras = {
     default: {
       destination: new Cesium.Cartesian3(-3943063.736175449, 3414581.6352823335, 3658893.0310073597),
@@ -130,20 +101,6 @@ let viewer;
       orientation: {
         direction: new Cesium.Cartesian3(0.05623367005752032, 0.5212780932672323, -0.8515321038173139),
         up: new Cesium.Cartesian3(-0.6223104366784804, 0.6852409260497324, 0.3783841879195591)
-      },
-      complete: () => {
-        if (fireworks) {
-          return;
-        }
-        viewer.clock.currentTime.secondsOfDay = ((19 + 3) * 60 + 30) * 60; // 19:30:00
-        $("#playButton").click();
-        setTimeout(() => {
-          fireworks = createFireworks();
-        }, 3000);
-        setTimeout(() => {
-          removeFireworks(fireworks);
-          fireworks = null;
-        }, 60000);
       }
     },
     ropeway: {
@@ -193,7 +150,6 @@ let viewer;
                 })
               }
             });
-
           }
         });
       }
@@ -212,9 +168,8 @@ let viewer;
       )
     }),
     terrainProvider: new Cesium.CesiumTerrainProvider({
-      // url: MAPTILE_URL,
-      // maximumLevel: 18,
       url: Cesium.IonResource.fromAssetId(770371),  // pleatau terrain
+      // maximumLevel: 18,
       requestVertexNormals: true
     }),
 
@@ -269,7 +224,7 @@ let viewer;
   presetCameras.default.complete();
 
   // ---
-  viewer.selectedEntityChanged.addEventListener(function(selectedEntity) {
+  viewer.selectedEntityChanged.addEventListener((selectedEntity) => {
     if (Cesium.defined(selectedEntity)) {
       if (Cesium.defined(selectedEntity.name)) {
         console.log('Selected ' + selectedEntity.name);
@@ -285,7 +240,6 @@ let viewer;
 
   // ---
 
-  // getJSON("./annos/anno_wt.geojson").then(annogj => {
   getJSON("./data/anno.geojson").then(annogj => {
     annogj.features.map(f => {
       const coord = f.geometry.coordinates;
@@ -330,17 +284,6 @@ let viewer;
         new Cesium.JulianDate()
       );
     switch (e.key) {
-      // case "f":
-      //   if (!fireworks) {
-      //     fireworks = createFireworks();
-      //   }
-      //   break;
-      // case "F":
-      //   if (fireworks) {
-      //     removeFireworks(fireworks);
-      //     fireworks = null;
-      //   }
-      //   break;
       case "p":
         console.log(
           viewer.camera.position,
@@ -440,8 +383,8 @@ let viewer;
   let loadedCzmls = [];
   let lastLoadAt = null;
   let lastCzdses = [];
-  function loadTodaysCzmls(czmls) {
-    function setSpecifiedDayOnCzml(czml, dayNumber) {
+  const loadTodaysCzmls = (czmls) => {
+    const setSpecifiedDayOnCzml = (czml, dayNumber) => {
       czml.slice(1).forEach(packet => {
         const jd = Cesium.JulianDate.fromIso8601(packet.position.epoch);
         jd.dayNumber = dayNumber;
@@ -496,137 +439,4 @@ let viewer;
       loadTodaysCzmls(loadedCzmls);
     }
   });
-
-  // --
-
-  function createFireworks() {
-    Cesium.Math.setRandomNumberSeed(315);
-
-    var modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(
-      Cesium.Cartesian3.fromDegrees(139.4791299, 35.3054307)
-    );
-    var emitterInitialLocation = new Cesium.Cartesian3(0.0, 0.0, 330.0);
-    var particleCanvas;
-
-    function getImage() {
-      if (!Cesium.defined(particleCanvas)) {
-        particleCanvas = document.createElement("canvas");
-        particleCanvas.width = 20;
-        particleCanvas.height = 20;
-        var context2D = particleCanvas.getContext("2d");
-        context2D.beginPath();
-        context2D.arc(8, 8, 8, 0, Cesium.Math.TWO_PI, true);
-        context2D.closePath();
-        context2D.fillStyle = "rgb(255, 255, 255)";
-        context2D.fill();
-      }
-      return particleCanvas;
-    }
-
-    var minimumExplosionSize = 80.0;
-    var maximumExplosionSize = 160.0;
-    var particlePixelSize = new Cesium.Cartesian2(7.0, 7.0);
-    var burstSize = 200.0;
-    var lifetime = 10.0;
-    var numberOfFireworks = 20.0;
-    var emitterModelMatrixScratch = new Cesium.Matrix4();
-
-    function createFirework(offset, color, bursts) {
-      var position = Cesium.Cartesian3.add(
-        emitterInitialLocation,
-        offset,
-        new Cesium.Cartesian3()
-      );
-      var emitterModelMatrix = Cesium.Matrix4.fromTranslation(
-        position,
-        emitterModelMatrixScratch
-      );
-      var particleToWorld = Cesium.Matrix4.multiply(
-        modelMatrix,
-        emitterModelMatrix,
-        new Cesium.Matrix4()
-      );
-      var worldToParticle = Cesium.Matrix4.inverseTransformation(
-        particleToWorld,
-        particleToWorld
-      );
-
-      var size = Cesium.Math.randomBetween(
-        minimumExplosionSize,
-        maximumExplosionSize
-      );
-      var particlePositionScratch = new Cesium.Cartesian3();
-      var force = function(particle) {
-        var position = Cesium.Matrix4.multiplyByPoint(
-          worldToParticle,
-          particle.position,
-          particlePositionScratch
-        );
-        if (Cesium.Cartesian3.magnitudeSquared(position) >= size * size) {
-          Cesium.Cartesian3.clone(Cesium.Cartesian3.ZERO, particle.velocity);
-        }
-      };
-
-      var normalSize =
-        (size - minimumExplosionSize) /
-        (maximumExplosionSize - minimumExplosionSize);
-      var minLife = 0.8;
-      var maxLife = 1.6;
-      var life = normalSize * (maxLife - minLife) + minLife;
-
-      return new Cesium.ParticleSystem({
-        image: getImage(),
-        startColor: color,
-        endColor: color.withAlpha(0.0),
-        particleLife: life,
-        speed: 100.0,
-        imageSize: particlePixelSize,
-        emissionRate: 0,
-        emitter: new Cesium.SphereEmitter(0.1),
-        bursts: bursts,
-        lifetime: lifetime,
-        updateCallback: force,
-        modelMatrix: modelMatrix,
-        emitterModelMatrix: emitterModelMatrix
-      });
-    }
-
-    let fireworks = [];
-    var colorOptions = [
-      { minimumRed: 0.75, green: 0.0, minimumBlue: 0.8, alpha: 1.0 },
-      { red: 0.0, minimumGreen: 0.75, minimumBlue: 0.8, alpha: 1.0 },
-      { red: 0.0, green: 0.0, minimumBlue: 0.8, alpha: 1.0 },
-      { minimumRed: 0.75, minimumGreen: 0.75, blue: 0.0, alpha: 1.0 }
-    ];
-    for (var i = 0; i < numberOfFireworks; ++i) {
-      var offset = new Cesium.Cartesian3(
-        Cesium.Math.randomBetween(-80, 80),
-        Cesium.Math.randomBetween(-80, 80),
-        Cesium.Math.randomBetween(-50, 50)
-      );
-      var color = Cesium.Color.fromRandom(
-        colorOptions[i % colorOptions.length]
-      );
-      var bursts = [];
-      for (var j = 0; j < 3; ++j) {
-        bursts.push(
-          new Cesium.ParticleBurst({
-            time: Cesium.Math.nextRandomNumber() * lifetime,
-            minimum: burstSize,
-            maximum: burstSize
-          })
-        );
-      }
-      const firework = createFirework(offset, color, bursts);
-      viewer.scene.primitives.add(firework);
-      fireworks.push(firework);
-    }
-    return fireworks;
-  }
-
-  function removeFireworks(fireworks) {
-    fireworks.forEach(firework => {
-      viewer.scene.primitives.remove(firework);
-    });
-  }
 })();
