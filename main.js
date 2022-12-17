@@ -3,8 +3,9 @@ const getJSON = (url) => fetch(url).then((response) => response.json());
 // ---
 
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/jp-mierune-streets/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
-// const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
-const MAPTILE_URL = './data/_maptiles/{z}/{x}/{y}.png'
+const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
+// const MAPTILE_URL = 'https://api.maptiler.com/maps/70f29ecc-6aec-4391-9474-65fee08bed94/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
+// const MAPTILE_URL = './data/_maptiles/{z}/{x}/{y}.png'
 
 const TILESET_FEATURES_URL = './data/3dtiles/14382_hakone-machi_building/bldg_notexture/tileset.json'
 const CAMERA_DESTINATION = Cesium.Cartesian3.fromDegrees(139.103528, 35.233333, 400)
@@ -240,14 +241,13 @@ let viewer;
 
   // ---
 
-  getJSON("./data/anno.geojson").then(annogj => {
-    annogj.features.map(f => {
+  getJSON("./data/anno.geojson").then(geoj => {
+    geoj.features.filter(f => !(["0110", "0210", "0220"].includes(f.properties.ftCode))).map(f => {
       const coord = f.geometry.coordinates;
-      const height =
-        f.properties.annoCtg == "_" ? 300: 15;
+      const height = f.properties.annoCtg == "_" ? 300: 15;
       const distanceDisplay = ["0312", "0352"].includes(f.properties.ftCode)
         ? undefined
-        : ["0422", "0431"].includes(f.properties.ftCode)
+        : ["0411", "0412", "0421", "0422", "0431"].includes(f.properties.ftCode)
         ? new Cesium.DistanceDisplayCondition(0, 4000)
         : new Cesium.DistanceDisplayCondition(0, 1000);
       const anno = viewer.entities.add({
@@ -257,6 +257,23 @@ let viewer;
           font: "20px sans-serif",
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           distanceDisplayCondition: distanceDisplay,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
+        }
+      });
+    });
+  });
+  getJSON("./data/bldsbl.geojson").then(geoj => {
+    geoj.features.filter(f => f.properties.name).map(f => {
+      const coord = f.geometry.coordinates;
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(coord[0], coord[1], 10),
+        label: {
+          text: f.properties.name,
+          font: "20px sans-serif",
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 1000),
           horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
@@ -411,6 +428,8 @@ let viewer;
     getJSON("./data/vehicles/ropeway_2_czml.json"),
     getJSON("./data/vehicles/ropeway_3_czml.json"),
     getJSON("./data/vehicles/vehicle_yumoto_czml.json"),
+    getJSON("./data/vehicles/pedestrian_a_czml.json"),
+    getJSON("./data/vehicles/pedestrian_b_czml.json"),
     // getJSON("./transports/shonan-monorail_czml.json"),
     // getJSON("./transports/enodenbus_czml.json"),
     // getJSON("./transports/car-r135_czml.json"),
