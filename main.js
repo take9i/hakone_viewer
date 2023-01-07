@@ -5,8 +5,7 @@ const getJSON = (url) => fetch(url).then((response) => response.json());
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/jp-mierune-streets/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/70f29ecc-6aec-4391-9474-65fee08bed94/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
-const MAPTILE_URL = './data/_maptiles/{z}/{x}/{y}.png'
-
+const MAPTILE_URL = 'http://localhost:7777/services/maptiles/tiles/{z}/{x}/{y}.png'
 const TILESET_FEATURES_URL = './data/3dtiles/14382_hakone-machi_building/bldg_notexture/tileset.json'
 const CAMERA_DESTINATION = Cesium.Cartesian3.fromDegrees(139.103528, 35.233333, 400)
 
@@ -160,7 +159,7 @@ let viewer;
   viewer = new Cesium.Viewer("map", {
     imageryProvider: new Cesium.UrlTemplateImageryProvider({
       url: MAPTILE_URL,
-      maximumLevel: 18,
+      maximumLevel: 16,
       credit: new Cesium.Credit(
         "<ul>" +
         "<li>国土地理院<br><small>国土地理院長の承認を得て、同院発行の数値地図(国土基本情報) 電子国土基本図(地図情報)、数値地図(国土基本情報) 電子国土基本図(地名情報) 及び 基盤地図情報を使用した。(承認番号 平30情使、 第705号)</small></li>" +
