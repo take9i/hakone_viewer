@@ -12,7 +12,18 @@ const TILESET_FEATURES_URL = "./3dtiles/14382_hakone-machi_building/bldg_notextu
 C.Ion.defaultAccessToken =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UyMjcwOS00MDY1LTQxYjEtYjZjMy00YTU0ZTg5MmViYWQiLCJpZCI6ODAzMDYsImlhdCI6MTY0Mjc0ODI2MX0.dkwAL1CcljUV7NA7fDbhXXnmyZQU_c-G5zRx8PtEcxE";
 
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+
+const tail = (ary) => ary[ary.length - 1];
+const zip = (...args) => args[0].map((_, i) => args.map((arg) => arg[i]));
 const getJSON = (url) => fetch(url).then((response) => response.json());
+
+const getRandomInt = (min, max) => {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
+}
 
 const viewer = new C.Viewer("map", {
   imageryProvider: new C.UrlTemplateImageryProvider({
@@ -188,32 +199,32 @@ const vehicle = viewer.entities.add({
     dimensions: new C.Cartesian3(5, 2, 2),
     material: C.Color.ORANGE,
     shadows: C.ShadowMode.ENABLED,
+    // heightReference: C.HeightReference.RELATIVE_TO_GROUND
   },
 });
 
-document.addEventListener("keydown", function (e) {
-  switch (e.keyCode) {
-    case 40:
-      // speed down
+document.addEventListener("keydown", (event) => {
+  switch (event.code) {
+    case "KeyS":
+    case "ArrowDown":
       speed = Math.max(--speed, -100);
       break;
-    case 38:
+    case "KeyW":
+    case "ArrowUp":
       // speed up
       speed = Math.min(++speed, 100);
       break;
-    case 39:
-      // turn right
-      hpRoll.heading += deltaRadians;
-      if (hpRoll.heading > C.Math.TWO_PI) {
-        hpRoll.heading -= C.Math.TWO_PI;
-      }
-      break;
-    case 37:
+    case "KeyA":
+    case "ArrowLeft":
       // turn left
       hpRoll.heading -= deltaRadians;
-      if (hpRoll.heading < 0.0) {
-        hpRoll.heading += C.Math.TWO_PI;
-      }
+      hpRoll.heading += (hpRoll.heading < 0.0) ? C.Math.TWO_PI : 0;
+      break;
+    case "KeyD":
+    case "ArrowRight":
+      // turn right
+      hpRoll.heading += deltaRadians;
+      hpRoll.heading -= (hpRoll.heading > C.Math.TWO_PI) ? C.Math.TWO_PI : 0;
       break;
     default:
   }
@@ -230,6 +241,93 @@ viewer.scene.preUpdate.addEventListener((scene, time) => {
     vehicleModelMatrix
   );
 });
+
+getJSON("./_roads_nw.json").then((json) => {
+  const nw = new jsnx.MultiDiGraph()
+  nw.addEdgesFrom(json)
+  window._nw = nw;
+
+  let personOnEdge = [[139.105047306, 35.233695833], [139.10396225, 35.233333472], 0];
+  let personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], 160);
+  let personDistance = 0;
+  let personSpeed = 20;
+  let lastTime = viewer.clock.currentTime;
+  const person = viewer.entities.add({
+    position: new C.CallbackProperty(() => personPosition, false),
+    name: "person",
+    ellipsoid: {
+      radii: new C.Cartesian3(2, 2, 2),
+      material: C.Color.WHITE,
+      shadows: C.ShadowMode.ENABLED,
+    },
+  });
+
+  const getEdges = (node) => {
+    const edges = nw.neighbors(node).map((nextnode) => {
+      return Object.keys(nw.getEdgeData(node, nextnode)).map((key) => [node, nextnode, key]);
+    });
+    return flatten(edges);
+  };
+
+  document.addEventListener("keydown", (event) => {
+    switch (event.code) {
+      case "KeyA":
+        const edges = getEdges(personOnEdge[1]);
+        personOnEdge = edges[getRandomInt(0, edges.length)]
+        personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], 160);
+        break;
+      default:
+    }
+  });
+
+  viewer.scene.preUpdate.addEventListener((scene, time) => {
+    const getCos = (v1, v2) => {
+      const dot = (v1, v2) => v1[0] * v2[0] + v1[1] * v2[1];
+      const mag = (v) => Math.hypot(v[0], v[1]);
+      // return Math.acos(dot(v1, v2) / (mag(v1) * mag(v2)))  // if you want an angle, use this
+      return dot(v1, v2) / (mag(v1) * mag(v2))
+    }
+    const getEdges = (node) => {
+      return nw.neighbors(node).map(nextNode =>
+        Object.keys(nw.getEdgeData(node, nextNode)).map((key) => [node, nextNode, key])
+      ).flat();
+    };
+    const getEdgeVec = (edge) => {
+      const vec = (p1, p2) => [p2[0] - p1[0], p2[1] - p1[1]]
+      const { coords } = nw.getEdgeData(...edge)
+      return vec(coords[0], tail(coords))
+    }
+    const getCoord = (c1, c2, r) => {
+      const rr = 1 - r;
+      return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r]
+    }
+
+    const dt = C.JulianDate.secondsDifference(time, lastTime)
+    personDistance += dt * personSpeed;
+    const { coords, distances } = nw.getEdgeData(...personOnEdge)
+    if (tail(distances) <= personDistance) {
+      const nextEdges = getEdges(personOnEdge[1]).map(ne => [getCos(getEdgeVec(personOnEdge), getEdgeVec(ne)), ne])
+      nextEdges.sort((a, b) => b[0] - a[0])[0][1]
+      personOnEdge = nextEdges[0][1]
+
+      // const nextEdges = getEdges(personOnEdge[1]);
+      // personOnEdge = nextEdges[getRandomInt(0, nextEdges.length)]
+      personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], 160);
+      personDistance = 0;
+    } else {
+      for (const [c1, c2, d1, d2] of zip(coords.slice(0, -1), coords.slice(1), distances.slice(0, -1), distances.slice(1))) {
+        if (d1 <= personDistance && personDistance < d2) {
+          const r = (personDistance - d1) / (d2 - d1)
+          const c = getCoord(c1, c2, r)
+          personPosition = C.Cartesian3.fromDegrees(c[0], c[1], 160);
+        }
+      }
+    }
+    lastTime = time;
+  });
+});
+
+
 
 window._viewer = viewer;
 window.Cesium = C;
