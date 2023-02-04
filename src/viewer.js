@@ -1,5 +1,6 @@
 import * as C from "cesium";
 import { getPresetCameras } from "./presetCameras.js";
+/*global jsnx*/
 
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/jp-mierune-streets/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
@@ -12,18 +13,9 @@ const TILESET_FEATURES_URL = "./3dtiles/14382_hakone-machi_building/bldg_notextu
 C.Ion.defaultAccessToken =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UyMjcwOS00MDY1LTQxYjEtYjZjMy00YTU0ZTg5MmViYWQiLCJpZCI6ODAzMDYsImlhdCI6MTY0Mjc0ODI2MX0.dkwAL1CcljUV7NA7fDbhXXnmyZQU_c-G5zRx8PtEcxE";
 
-const DEG2RAD = Math.PI / 180;
-const RAD2DEG = 180 / Math.PI;
-
 const tail = (ary) => ary[ary.length - 1];
 const zip = (...args) => args[0].map((_, i) => args.map((arg) => arg[i]));
 const getJSON = (url) => fetch(url).then((response) => response.json());
-
-const getRandomInt = (min, max) => {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
-}
 
 const viewer = new C.Viewer("map", {
   imageryProvider: new C.UrlTemplateImageryProvider({
@@ -31,9 +23,9 @@ const viewer = new C.Viewer("map", {
     maximumLevel: 16,
     credit: new C.Credit(
       "<ul>" +
-      "<li>国土地理院<br><small>国土地理院長の承認を得て、同院発行の数値地図(国土基本情報) 電子国土基本図(地図情報)、数値地図(国土基本情報) 電子国土基本図(地名情報) 及び 基盤地図情報を使用した。(承認番号 平30情使、 第705号)</small></li>" +
-      '<li>&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors</li>' +
-      "</ul>"
+        "<li>国土地理院<br><small>国土地理院長の承認を得て、同院発行の数値地図(国土基本情報) 電子国土基本図(地図情報)、数値地図(国土基本情報) 電子国土基本図(地名情報) 及び 基盤地図情報を使用した。(承認番号 平30情使、 第705号)</small></li>" +
+        '<li>&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors</li>' +
+        "</ul>"
     ),
   }),
   terrainProvider: new C.CesiumTerrainProvider({
@@ -107,9 +99,9 @@ getJSON("./anno.geojson").then((geoj) => {
       const distanceDisplay = ["0312", "0352"].includes(f.properties.ftCode)
         ? undefined
         : ["0411", "0412", "0421", "0422", "0431"].includes(f.properties.ftCode)
-          ? new C.DistanceDisplayCondition(0, 4000)
-          : new C.DistanceDisplayCondition(0, 1000);
-      const anno = viewer.entities.add({
+        ? new C.DistanceDisplayCondition(0, 4000)
+        : new C.DistanceDisplayCondition(0, 1000);
+      viewer.entities.add({
         position: C.Cartesian3.fromDegrees(coord[0], coord[1], height),
         label: {
           text: f.properties.knj,
@@ -188,7 +180,7 @@ const deltaRadians = C.Math.toRadians(3.0);
 const speedVector = new C.Cartesian3();
 const vehicleModelMatrix = C.Transforms.headingPitchRollToFixedFrame(position, hpRoll);
 const vehicleRotation = new C.Matrix3();
-const vehicle = viewer.entities.add({
+viewer.entities.add({
   position: new C.CallbackProperty(() => position, false),
   orientation: new C.CallbackProperty(
     () => C.Quaternion.fromRotationMatrix(C.Matrix4.getMatrix3(vehicleModelMatrix, vehicleRotation)),
@@ -218,19 +210,19 @@ document.addEventListener("keydown", (event) => {
     case "ArrowLeft":
       // turn left
       hpRoll.heading -= deltaRadians;
-      hpRoll.heading += (hpRoll.heading < 0.0) ? C.Math.TWO_PI : 0;
+      hpRoll.heading += hpRoll.heading < 0.0 ? C.Math.TWO_PI : 0;
       break;
     case "KeyD":
     case "ArrowRight":
       // turn right
       hpRoll.heading += deltaRadians;
-      hpRoll.heading -= (hpRoll.heading > C.Math.TWO_PI) ? C.Math.TWO_PI : 0;
+      hpRoll.heading -= hpRoll.heading > C.Math.TWO_PI ? C.Math.TWO_PI : 0;
       break;
     default:
   }
 });
 
-viewer.scene.preUpdate.addEventListener((scene, time) => {
+viewer.scene.preUpdate.addEventListener(() => {
   C.Cartesian3.multiplyByScalar(C.Cartesian3.UNIT_X, speed / 10, speedVector);
   C.Matrix4.multiplyByPoint(vehicleModelMatrix, speedVector, position);
   C.Transforms.headingPitchRollToFixedFrame(
@@ -243,8 +235,8 @@ viewer.scene.preUpdate.addEventListener((scene, time) => {
 });
 
 getJSON("./_roads_nw.json").then((json) => {
-  const nw = new jsnx.MultiDiGraph()
-  nw.addEdgesFrom(json)
+  const nw = new jsnx.MultiDiGraph();
+  nw.addEdgesFrom(json);
   window._nw = nw;
 
   let personOnEdge = [[139.105047306, 35.233695833], [139.10396225, 35.233333472], 0];
@@ -252,7 +244,11 @@ getJSON("./_roads_nw.json").then((json) => {
   let personDistance = 0;
   let personSpeed = 20;
   let lastTime = viewer.clock.currentTime;
-  const person = viewer.entities.add({
+  let personTurnTo = null;
+  let fromBehind = false;
+  const hpRange = new C.HeadingPitchRange();
+
+  viewer.entities.add({
     position: new C.CallbackProperty(() => personPosition, false),
     name: "person",
     ellipsoid: {
@@ -262,72 +258,98 @@ getJSON("./_roads_nw.json").then((json) => {
     },
   });
 
-  const getEdges = (node) => {
-    const edges = nw.neighbors(node).map((nextnode) => {
-      return Object.keys(nw.getEdgeData(node, nextnode)).map((key) => [node, nextnode, key]);
-    });
-    return flatten(edges);
-  };
-
   document.addEventListener("keydown", (event) => {
     switch (event.code) {
       case "KeyA":
-        const edges = getEdges(personOnEdge[1]);
-        personOnEdge = edges[getRandomInt(0, edges.length)]
-        personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], 160);
+      case "ArrowLeft":
+        personTurnTo = "left";
+        console.log(personTurnTo);
+        break;
+      case "KeyD":
+      case "ArrowRight":
+        personTurnTo = "right";
+        console.log(personTurnTo);
+        break;
+      case "Space":
+        fromBehind = !fromBehind;
+        if (fromBehind) {
+          const offset = C.Cartesian3.subtract(personPosition, viewer.camera.position, new C.Cartesian3());
+          console.log(personPosition, viewer.camera.position, offset);
+          const r = C.Cartesian3.magnitude(offset);
+          hpRange.heading = Math.atan2(-offset.x, -offset.y);
+          hpRange.pitch = Math.asin(-offset.z / r);
+          hpRange.range = r;
+          console.log(hpRange);
+        }
         break;
       default:
     }
   });
 
+  const getAngle = (v1, v2) => {
+    const dot = (v1, v2) => v1[0] * v2[0] + v1[1] * v2[1];
+    const mag = (v) => Math.hypot(v[0], v[1]);
+    const c = dot(v1, v2) / (mag(v1) * mag(v2));
+    return Math.acos(Math.min(Math.max(c, -1), 1));
+  };
+  const getEdges = (node) => {
+    return nw
+      .neighbors(node)
+      .map((nextNode) => Object.keys(nw.getEdgeData(node, nextNode)).map((key) => [node, nextNode, key]))
+      .flat();
+  };
+  const getEdgeVec = (edge) => {
+    const vec = (p1, p2) => [p2[0] - p1[0], p2[1] - p1[1]];
+    const { coords } = nw.getEdgeData(...edge);
+    return vec(coords[0], tail(coords));
+  };
+  const getCoord = (c1, c2, r) => {
+    const rr = 1 - r;
+    return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r];
+  };
+
   viewer.scene.preUpdate.addEventListener((scene, time) => {
-    const getCos = (v1, v2) => {
-      const dot = (v1, v2) => v1[0] * v2[0] + v1[1] * v2[1];
-      const mag = (v) => Math.hypot(v[0], v[1]);
-      // return Math.acos(dot(v1, v2) / (mag(v1) * mag(v2)))  // if you want an angle, use this
-      return dot(v1, v2) / (mag(v1) * mag(v2))
-    }
-    const getEdges = (node) => {
-      return nw.neighbors(node).map(nextNode =>
-        Object.keys(nw.getEdgeData(node, nextNode)).map((key) => [node, nextNode, key])
-      ).flat();
-    };
-    const getEdgeVec = (edge) => {
-      const vec = (p1, p2) => [p2[0] - p1[0], p2[1] - p1[1]]
-      const { coords } = nw.getEdgeData(...edge)
-      return vec(coords[0], tail(coords))
-    }
-    const getCoord = (c1, c2, r) => {
-      const rr = 1 - r;
-      return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r]
-    }
-
-    const dt = C.JulianDate.secondsDifference(time, lastTime)
+    const dt = C.JulianDate.secondsDifference(time, lastTime);
     personDistance += dt * personSpeed;
-    const { coords, distances } = nw.getEdgeData(...personOnEdge)
+    const { coords, distances } = nw.getEdgeData(...personOnEdge);
     if (tail(distances) <= personDistance) {
-      const nextEdges = getEdges(personOnEdge[1]).map(ne => [getCos(getEdgeVec(personOnEdge), getEdgeVec(ne)), ne])
-      nextEdges.sort((a, b) => b[0] - a[0])[0][1]
-      personOnEdge = nextEdges[0][1]
-
-      // const nextEdges = getEdges(personOnEdge[1]);
-      // personOnEdge = nextEdges[getRandomInt(0, nextEdges.length)]
+      const nextEdges = getEdges(personOnEdge[1]).map((ne) => [
+        getAngle(getEdgeVec(personOnEdge), getEdgeVec(ne)),
+        ne,
+      ]);
+      let sorter = null;
+      if (personTurnTo == "left") {
+        sorter = (a, b) => Math.abs(a[0] - Math.PI / 2) - Math.abs(b[0] - Math.PI / 2);
+        personTurnTo = null;
+      } else if (personTurnTo == "right") {
+        sorter = (a, b) => Math.abs(a[0] + Math.PI / 2) - Math.abs(b[0] + Math.PI / 2);
+        personTurnTo = null;
+      } else {
+        sorter = (a, b) => Math.abs(a[0]) - Math.abs(b[0]);
+      }
+      personOnEdge = [...nextEdges].sort(sorter)[0][1];
       personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], 160);
       personDistance = 0;
     } else {
-      for (const [c1, c2, d1, d2] of zip(coords.slice(0, -1), coords.slice(1), distances.slice(0, -1), distances.slice(1))) {
+      for (const [c1, c2, d1, d2] of zip(
+        coords.slice(0, -1),
+        coords.slice(1),
+        distances.slice(0, -1),
+        distances.slice(1)
+      )) {
         if (d1 <= personDistance && personDistance < d2) {
-          const r = (personDistance - d1) / (d2 - d1)
-          const c = getCoord(c1, c2, r)
+          const r = (personDistance - d1) / (d2 - d1);
+          const c = getCoord(c1, c2, r);
           personPosition = C.Cartesian3.fromDegrees(c[0], c[1], 160);
         }
       }
     }
+    if (fromBehind) {
+      viewer.camera.lookAt(personPosition, hpRange);
+    }
     lastTime = time;
   });
 });
-
-
 
 window._viewer = viewer;
 window.Cesium = C;
