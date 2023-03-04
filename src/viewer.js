@@ -13,6 +13,7 @@ const TILESET_FEATURES_URL = "./3dtiles/14382_hakone-machi_building/bldg_notextu
 C.Ion.defaultAccessToken =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UyMjcwOS00MDY1LTQxYjEtYjZjMy00YTU0ZTg5MmViYWQiLCJpZCI6ODAzMDYsImlhdCI6MTY0Mjc0ODI2MX0.dkwAL1CcljUV7NA7fDbhXXnmyZQU_c-G5zRx8PtEcxE";
 
+const GEOID = 36.7071;
 const tail = (ary) => ary[ary.length - 1];
 const zip = (...args) => args[0].map((_, i) => args.map((arg) => arg[i]));
 const getJSON = (url) => fetch(url).then((response) => response.json());
@@ -39,7 +40,7 @@ const viewer = new C.Viewer("map", {
   // fullscreenButton: false,
   geocoder: false,
   homeButton: false,
-  //infoBox: false,
+  infoBox: false,
   sceneModePicker: false,
   selectionIndicator: false,
   timeline: false,
@@ -239,16 +240,19 @@ getJSON("./_roads_nw.json").then((json) => {
   nw.addEdgesFrom(json);
   window._nw = nw;
 
-  let personOnEdge = [[139.105047306, 35.233695833], [139.10396225, 35.233333472], 0];
-  let personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], 160);
+  let personOnEdge = [
+    [139.105047306, 35.233695833, 93.730600826532],
+    [139.10396225, 35.233333472, 94.61836036288149],
+    0,
+  ];
+  let personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], personOnEdge[0][2] + GEOID);
   let personDistance = 0;
   let personSpeed = 20;
   let lastTime = viewer.clock.currentTime;
   let personTurnTo = null;
   let fromBehind = false;
-  const hpRange = new C.HeadingPitchRange();
 
-  viewer.entities.add({
+  const person = viewer.entities.add({
     position: new C.CallbackProperty(() => personPosition, false),
     name: "person",
     ellipsoid: {
@@ -257,6 +261,22 @@ getJSON("./_roads_nw.json").then((json) => {
       shadows: C.ShadowMode.ENABLED,
     },
   });
+  const anchor = viewer.entities.add({
+    position: new C.CallbackProperty(() => {
+      const up = C.Cartesian3.multiplyByScalar(
+        C.Cartesian3.normalize(personPosition, new C.Cartesian3()),
+        20,
+        new C.Cartesian3()
+      );
+      return C.Cartesian3.add(personPosition, up, new C.Cartesian3());
+    }, false),
+    name: "anchor",
+    ellipsoid: {
+      radii: new C.Cartesian3(0.2, 0.2, 0.2),
+      material: C.Color.WHITE,
+    },
+  });
+  window.anchor = anchor;
 
   document.addEventListener("keydown", (event) => {
     switch (event.code) {
@@ -273,13 +293,13 @@ getJSON("./_roads_nw.json").then((json) => {
       case "Space":
         fromBehind = !fromBehind;
         if (fromBehind) {
-          const offset = C.Cartesian3.subtract(personPosition, viewer.camera.position, new C.Cartesian3());
-          console.log(personPosition, viewer.camera.position, offset);
-          const r = C.Cartesian3.magnitude(offset);
-          hpRange.heading = Math.atan2(-offset.x, -offset.y);
-          hpRange.pitch = Math.asin(-offset.z / r);
-          hpRange.range = r;
-          console.log(hpRange);
+          const p = anchor.position.getValue();
+          const diff = C.Cartesian3.subtract(viewer.camera.position, p, new C.Cartesian3());
+          const mat = C.Matrix4.inverseTransformation(C.Transforms.eastNorthUpToFixedFrame(p), new C.Matrix4());
+          anchor.viewFrom = C.Matrix4.multiplyByPointAsVector(mat, diff, new C.Cartesian3());
+          viewer.trackedEntity = anchor;
+        } else {
+          viewer.trackedEntity = undefined;
         }
         break;
       default:
@@ -305,7 +325,7 @@ getJSON("./_roads_nw.json").then((json) => {
   };
   const getCoord = (c1, c2, r) => {
     const rr = 1 - r;
-    return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r];
+    return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r, c1[2] * rr + c2[2] * r];
   };
 
   viewer.scene.preUpdate.addEventListener((scene, time) => {
@@ -328,7 +348,7 @@ getJSON("./_roads_nw.json").then((json) => {
         sorter = (a, b) => Math.abs(a[0]) - Math.abs(b[0]);
       }
       personOnEdge = [...nextEdges].sort(sorter)[0][1];
-      personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], 160);
+      personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], personOnEdge[0][2] + GEOID);
       personDistance = 0;
     } else {
       for (const [c1, c2, d1, d2] of zip(
@@ -340,12 +360,22 @@ getJSON("./_roads_nw.json").then((json) => {
         if (d1 <= personDistance && personDistance < d2) {
           const r = (personDistance - d1) / (d2 - d1);
           const c = getCoord(c1, c2, r);
-          personPosition = C.Cartesian3.fromDegrees(c[0], c[1], 160);
+          personPosition = C.Cartesian3.fromDegrees(c[0], c[1], c[2] + GEOID + 5);
         }
       }
     }
     if (fromBehind) {
-      viewer.camera.lookAt(personPosition, hpRange);
+      viewer.trackedEntity = undefined;
+      const p = anchor.position.getValue();
+      const diff = C.Cartesian3.subtract(viewer.camera.position, p, new C.Cartesian3());
+      const diff2 = C.Cartesian3.multiplyByScalar(
+        C.Cartesian3.normalize(diff, new C.Cartesian3()),
+        Math.min(C.Cartesian3.magnitude(diff), 100),
+        new C.Cartesian3()
+      );
+      const mat = C.Matrix4.inverseTransformation(C.Transforms.eastNorthUpToFixedFrame(p), new C.Matrix4());
+      anchor.viewFrom = C.Matrix4.multiplyByPointAsVector(mat, diff2, new C.Cartesian3());
+      viewer.trackedEntity = anchor;
     }
     lastTime = time;
   });
