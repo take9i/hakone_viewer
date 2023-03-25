@@ -17,6 +17,7 @@ const GEOID = 36.7071;
 const tail = (ary) => ary[ary.length - 1];
 const zip = (...args) => args[0].map((_, i) => args.map((arg) => arg[i]));
 const getJSON = (url) => fetch(url).then((response) => response.json());
+const getC3 = (coord, zBias) => C.Cartesian3.fromDegrees(coord[0], coord[1], coord[2] + zBias);
 
 const viewer = new C.Viewer("map", {
   imageryProvider: new C.UrlTemplateImageryProvider({
@@ -240,21 +241,59 @@ getJSON("./_roads_nw.json").then((json) => {
   nw.addEdgesFrom(json);
   window._nw = nw;
 
-  let personOnEdge = [
-    [139.105047306, 35.233695833, 93.730600826532],
-    [139.10396225, 35.233333472, 94.61836036288149],
-    0,
-  ];
-  let personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], personOnEdge[0][2] + GEOID);
+  const fmag = (v) => Math.hypot(v[0], v[1]);
+  const fdot = (a, b) => (a[0] * b[0] + a[1] * b[1]) / (fmag(a) * fmag(b));
+  const fcross = (a, b) => (a[0] * b[1] - a[1] * b[0]) / (fmag(a) * fmag(b));
+  const fnorm = (a) => {
+    const mag = fmag(a) * 3600;
+    return [a[0] / mag, a[1] / mag];
+  };
+  const fadd = (a, b) => [a[0] + b[0], a[1] + b[1]];
+  const fsub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  const fmul = (a, b) => [a[0] * b, a[1] * b];
+  const fdiv = (a, b) => [a[0] / b, a[1] / b];
+  const getEdges = (node) =>
+    nw
+      .neighbors(node)
+      .map((nextNode) => Object.keys(nw.getEdgeData(node, nextNode)).map((key) => [node, nextNode, key]))
+      .flat();
+  const getEdgeVec = (edge) => {
+    const { coords } = nw.getEdgeData(...edge);
+    return fnorm(fsub(coords[1], coords[0]));
+  };
+  const getNextEdges = (edge) => {
+    const eq = (a, b) => "" + a == "" + b;
+    let nextEdges = getEdges(edge[1]);
+    if (nextEdges.length >= 2) {
+      nextEdges = nextEdges.filter((nextEdge) => !(eq(nextEdge[0], edge[1]) && eq(nextEdge[1], edge[0])));
+    }
+    const targets = nextEdges
+      .map((next) => {
+        const dot = fdot(getEdgeVec(edge), getEdgeVec(next));
+        const cross = fcross(getEdgeVec(edge), getEdgeVec(next));
+        return [cross < 0 ? dot - 1 : 1 - dot, next];
+      })
+      .sort((a, b) => a[0] - b[0])
+      .map(([w, next], i) => [i, w, next]);
+    const inext = targets.sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]))[0][0];
+    const nexts = targets.map(([i, w, next]) => next);
+    return [nexts, inext];
+  };
+  const getCoord = (c1, c2, r) => {
+    const rr = 1 - r;
+    return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r, c1[2] * rr + c2[2] * r];
+  };
+
+  let personOnEdge = [[139.105047306, 35.233695833, 93.731], [139.10396225, 35.233333472, 94.618], 0];
+  let personPosition = getC3(personOnEdge[0], GEOID);
   let personDistance = 0;
   let personSpeed = 20;
   let lastTime = viewer.clock.currentTime;
-  let personTurnTo = null;
   let fromBehind = false;
-
+  let [nextEdges, iNextEdge] = getNextEdges(personOnEdge);
   const person = viewer.entities.add({
-    position: new C.CallbackProperty(() => personPosition, false),
     name: "person",
+    position: new C.CallbackProperty(() => personPosition, false),
     ellipsoid: {
       radii: new C.Cartesian3(2, 2, 2),
       material: C.Color.WHITE,
@@ -262,6 +301,7 @@ getJSON("./_roads_nw.json").then((json) => {
     },
   });
   const anchor = viewer.entities.add({
+    name: "anchor",
     position: new C.CallbackProperty(() => {
       const up = C.Cartesian3.multiplyByScalar(
         C.Cartesian3.normalize(personPosition, new C.Cartesian3()),
@@ -270,25 +310,40 @@ getJSON("./_roads_nw.json").then((json) => {
       );
       return C.Cartesian3.add(personPosition, up, new C.Cartesian3());
     }, false),
-    name: "anchor",
     ellipsoid: {
       radii: new C.Cartesian3(0.2, 0.2, 0.2),
       material: C.Color.WHITE,
     },
   });
-  window.anchor = anchor;
+  const indicator = viewer.entities.add({
+    name: "indicator",
+    polyline: {
+      positions: new C.CallbackProperty(() => {
+        const nextEdge = nextEdges[iNextEdge];
+        const tail = nextEdge[0];
+        const head = fadd(tail, getEdgeVec(nextEdge)).concat(nextEdge[0][2]);
+        return [getC3(tail, GEOID + 10), getC3(head, GEOID + 10)];
+      }, false),
+      width: 5,
+      material: new C.PolylineOutlineMaterialProperty({
+        color: C.Color.ORANGE,
+        outlineWidth: 2,
+        outlineColor: C.Color.BLACK,
+      }),
+    },
+  });
 
   document.addEventListener("keydown", (event) => {
     switch (event.code) {
       case "KeyA":
       case "ArrowLeft":
-        personTurnTo = "left";
-        console.log(personTurnTo);
+        iNextEdge = iNextEdge > 0 ? iNextEdge - 1 : nextEdges.length - 1;
+        // console.log(iNextEdge, nextEdges.length);
         break;
       case "KeyD":
       case "ArrowRight":
-        personTurnTo = "right";
-        console.log(personTurnTo);
+        iNextEdge = iNextEdge < nextEdges.length - 1 ? iNextEdge + 1 : 0;
+        // console.log(iNextEdge, nextEdges.length);
         break;
       case "Space":
         fromBehind = !fromBehind;
@@ -306,50 +361,16 @@ getJSON("./_roads_nw.json").then((json) => {
     }
   });
 
-  const getAngle = (v1, v2) => {
-    const dot = (v1, v2) => v1[0] * v2[0] + v1[1] * v2[1];
-    const mag = (v) => Math.hypot(v[0], v[1]);
-    const c = dot(v1, v2) / (mag(v1) * mag(v2));
-    return Math.acos(Math.min(Math.max(c, -1), 1));
-  };
-  const getEdges = (node) => {
-    return nw
-      .neighbors(node)
-      .map((nextNode) => Object.keys(nw.getEdgeData(node, nextNode)).map((key) => [node, nextNode, key]))
-      .flat();
-  };
-  const getEdgeVec = (edge) => {
-    const vec = (p1, p2) => [p2[0] - p1[0], p2[1] - p1[1]];
-    const { coords } = nw.getEdgeData(...edge);
-    return vec(coords[0], tail(coords));
-  };
-  const getCoord = (c1, c2, r) => {
-    const rr = 1 - r;
-    return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r, c1[2] * rr + c2[2] * r];
-  };
-
   viewer.scene.preUpdate.addEventListener((scene, time) => {
     const dt = C.JulianDate.secondsDifference(time, lastTime);
     personDistance += dt * personSpeed;
     const { coords, distances } = nw.getEdgeData(...personOnEdge);
     if (tail(distances) <= personDistance) {
-      const nextEdges = getEdges(personOnEdge[1]).map((ne) => [
-        getAngle(getEdgeVec(personOnEdge), getEdgeVec(ne)),
-        ne,
-      ]);
-      let sorter = null;
-      if (personTurnTo == "left") {
-        sorter = (a, b) => Math.abs(a[0] - Math.PI / 2) - Math.abs(b[0] - Math.PI / 2);
-        personTurnTo = null;
-      } else if (personTurnTo == "right") {
-        sorter = (a, b) => Math.abs(a[0] + Math.PI / 2) - Math.abs(b[0] + Math.PI / 2);
-        personTurnTo = null;
-      } else {
-        sorter = (a, b) => Math.abs(a[0]) - Math.abs(b[0]);
-      }
-      personOnEdge = [...nextEdges].sort(sorter)[0][1];
-      personPosition = C.Cartesian3.fromDegrees(personOnEdge[0][0], personOnEdge[0][1], personOnEdge[0][2] + GEOID);
+      personOnEdge = nextEdges[iNextEdge];
+      personPosition = getC3(personOnEdge[0], GEOID);
       personDistance = 0;
+      [nextEdges, iNextEdge] = getNextEdges(personOnEdge);
+      indicator.polyline.material.color = nextEdges.length >= 2 ? C.Color.ORANGE : C.Color.DODGERBLUE;
     } else {
       for (const [c1, c2, d1, d2] of zip(
         coords.slice(0, -1),
@@ -370,7 +391,7 @@ getJSON("./_roads_nw.json").then((json) => {
       const diff = C.Cartesian3.subtract(viewer.camera.position, p, new C.Cartesian3());
       const diff2 = C.Cartesian3.multiplyByScalar(
         C.Cartesian3.normalize(diff, new C.Cartesian3()),
-        Math.min(C.Cartesian3.magnitude(diff), 100),
+        Math.min(C.Cartesian3.magnitude(diff), 300),
         new C.Cartesian3()
       );
       const mat = C.Matrix4.inverseTransformation(C.Transforms.eastNorthUpToFixedFrame(p), new C.Matrix4());
