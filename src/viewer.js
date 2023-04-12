@@ -5,9 +5,11 @@ import { getPresetCameras } from "./presetCameras.js";
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/jp-mierune-streets/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/70f29ecc-6aec-4391-9474-65fee08bed94/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
-const MAPTILE_URL = "http://localhost:7777/services/maptiles/tiles/{z}/{x}/{y}.png";
+// const MAPTILE_URL = "./tiles/{z}/{x}/{y}.png";
+const MAPTILE_URL = "https://d37haqiz7ucyfp.cloudfront.net/tiles/{z}/{x}/{y}.png";
 
-const TILESET_FEATURES_URL = "./3dtiles/14382_hakone-machi_building/bldg_notexture/tileset.json";
+// const TILESET_FEATURES_URL = "./3dtiles/hakone/bldg_notexture/tileset.json";
+const TILESET_FEATURES_URL = "https://d37haqiz7ucyfp.cloudfront.net/3dtiles/hakone/bldg_notexture/tileset.json";
 
 // pletau terrain
 C.Ion.defaultAccessToken =
