@@ -1,0 +1,2 @@
+# Git LFS — glTF バイナリ（クローン後は `git lfs install` を一度実行）
+*.glb filter=lfs diff=lfs merge=lfs -text

@@ -89,6 +89,27 @@ viewer.clock.currentTime.secondsOfDay = (8 + 3) * 3600;
 const presetCameras = getPresetCameras(viewer);
 viewer.camera.setView(presetCameras.default);
 
+/** 試験配置: public/models/house/house_a.glb（箱根湯本付近・地形クランプ） */
+const HOUSE_MODEL_URI = "/models/house/house_a.glb";
+// 東 50 m 後の地点から、さらに北へ約 50 m
+const houseLon = 139.106355;
+const houseLat = 35.233029;
+const houseEntity = viewer.entities.add({
+  name: "house_a",
+  position: C.Cartesian3.fromDegrees(houseLon, houseLat, 1),
+  model: {
+    uri: HOUSE_MODEL_URI,
+    heightReference: C.HeightReference.RELATIVE_TO_GROUND,
+    scale: 1.0,
+    minimumPixelSize: 48,
+    shadows: C.ShadowMode.ENABLED,
+  },
+});
+// 初回だけモデルへ寄って表示確認（不要ならこの .zoomTo ブロックを削除）
+viewer.zoomTo(houseEntity, new C.HeadingPitchRange(0, C.Math.toRadians(-30), 180)).catch((err) => {
+  console.error("house_a へのズームに失敗しました（モデル未読込・URL 誤り等）:", err);
+});
+
 getJSON("./anno.geojson").then((geoj) => {
   geoj.features
     .filter((f) => !["0110", "0210", "0220"].includes(f.properties.ftCode))
