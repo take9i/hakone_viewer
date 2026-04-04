@@ -1,4 +1,4 @@
-# hakone_player
+# shadows - house shadow viewer
 
 ## preparing
 
@@ -20,4 +20,9 @@ unzip _tmp/14382_hakone-machi_3DTiles_GeoPackage_Json_2.zip -d _tmp
 mkdir -p public/3dtiles/hakone
 unzip _tmp/14382_hakone-machi_3DTiles_GeoPackage_Json/01_building/14382_hakone-machi_building.zip -d public/3dtiles/hakone
 aws s3 sync public/3dtiles/ s3://public-osada/3dtiles/ --profile skc --dryrun
+```
+
+## run
+```
+npm run dev
 ```

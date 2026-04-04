@@ -1,6 +1,5 @@
 import * as C from "cesium";
 import { getPresetCameras } from "./presetCameras.js";
-/*global jsnx*/
 
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/jp-mierune-streets/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
 // const MAPTILE_URL = 'https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=Jjfw1w0QxuYiSUxyQ6mU'
@@ -15,11 +14,7 @@ const TILESET_FEATURES_URL = "https://d37haqiz7ucyfp.cloudfront.net/3dtiles/hako
 C.Ion.defaultAccessToken =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UyMjcwOS00MDY1LTQxYjEtYjZjMy00YTU0ZTg5MmViYWQiLCJpZCI6ODAzMDYsImlhdCI6MTY0Mjc0ODI2MX0.dkwAL1CcljUV7NA7fDbhXXnmyZQU_c-G5zRx8PtEcxE";
 
-const GEOID = 36.7071;
-const tail = (ary) => ary[ary.length - 1];
-const zip = (...args) => args[0].map((_, i) => args.map((arg) => arg[i]));
 const getJSON = (url) => fetch(url).then((response) => response.json());
-const getC3 = (coord, zBias) => C.Cartesian3.fromDegrees(coord[0], coord[1], coord[2] + zBias);
 
 const viewer = new C.Viewer("map", {
   imageryProvider: new C.UrlTemplateImageryProvider({
@@ -170,8 +165,6 @@ Promise.all([
   getJSON("./data/vehicles/ropeway_2_czml.json"),
   getJSON("./data/vehicles/ropeway_3_czml.json"),
   getJSON("./data/vehicles/vehicle_yumoto_czml.json"),
-  getJSON("./data/vehicles/pedestrian_a_czml.json"),
-  getJSON("./data/vehicles/pedestrian_b_czml.json"),
 ]).then((czmls) => {
   loadedCzmls = czmls;
   loadTodaysCzmls(loadedCzmls);
@@ -236,172 +229,6 @@ viewer.scene.preUpdate.addEventListener(() => {
     C.Transforms.eastNorthUpToFixedFrame,
     vehicleModelMatrix
   );
-});
-
-getJSON("./_roads_nw.json").then((json) => {
-  const nw = new jsnx.MultiDiGraph();
-  nw.addEdgesFrom(json);
-  window._nw = nw;
-
-  const fmag = (v) => Math.hypot(v[0], v[1]);
-  const fdot = (a, b) => (a[0] * b[0] + a[1] * b[1]) / (fmag(a) * fmag(b));
-  const fcross = (a, b) => (a[0] * b[1] - a[1] * b[0]) / (fmag(a) * fmag(b));
-  const fnorm = (a) => {
-    const mag = fmag(a) * 3600;
-    return [a[0] / mag, a[1] / mag];
-  };
-  const fadd = (a, b) => [a[0] + b[0], a[1] + b[1]];
-  const fsub = (a, b) => [a[0] - b[0], a[1] - b[1]];
-  const fmul = (a, b) => [a[0] * b, a[1] * b];
-  const fdiv = (a, b) => [a[0] / b, a[1] / b];
-  const getEdges = (node) =>
-    nw
-      .neighbors(node)
-      .map((nextNode) => Object.keys(nw.getEdgeData(node, nextNode)).map((key) => [node, nextNode, key]))
-      .flat();
-  const getEdgeVec = (edge) => {
-    const { coords } = nw.getEdgeData(...edge);
-    return fnorm(fsub(coords[1], coords[0]));
-  };
-  const getNextEdges = (edge) => {
-    const eq = (a, b) => "" + a == "" + b;
-    let nextEdges = getEdges(edge[1]);
-    if (nextEdges.length >= 2) {
-      nextEdges = nextEdges.filter((nextEdge) => !(eq(nextEdge[0], edge[1]) && eq(nextEdge[1], edge[0])));
-    }
-    const targets = nextEdges
-      .map((next) => {
-        const dot = fdot(getEdgeVec(edge), getEdgeVec(next));
-        const cross = fcross(getEdgeVec(edge), getEdgeVec(next));
-        return [cross < 0 ? dot - 1 : 1 - dot, next];
-      })
-      .sort((a, b) => a[0] - b[0])
-      .map(([w, next], i) => [i, w, next]);
-    const inext = targets.sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]))[0][0];
-    const nexts = targets.map(([i, w, next]) => next);
-    return [nexts, inext];
-  };
-  const getCoord = (c1, c2, r) => {
-    const rr = 1 - r;
-    return [c1[0] * rr + c2[0] * r, c1[1] * rr + c2[1] * r, c1[2] * rr + c2[2] * r];
-  };
-
-  let personOnEdge = [[139.105047306, 35.233695833, 93.731], [139.10396225, 35.233333472, 94.618], 0];
-  let personPosition = getC3(personOnEdge[0], GEOID);
-  let personDistance = 0;
-  let personSpeed = 20;
-  let lastTime = viewer.clock.currentTime;
-  let fromBehind = false;
-  let [nextEdges, iNextEdge] = getNextEdges(personOnEdge);
-  const person = viewer.entities.add({
-    name: "person",
-    position: new C.CallbackProperty(() => personPosition, false),
-    ellipsoid: {
-      radii: new C.Cartesian3(2, 2, 2),
-      material: C.Color.WHITE,
-      shadows: C.ShadowMode.ENABLED,
-    },
-  });
-  const anchor = viewer.entities.add({
-    name: "anchor",
-    position: new C.CallbackProperty(() => {
-      const up = C.Cartesian3.multiplyByScalar(
-        C.Cartesian3.normalize(personPosition, new C.Cartesian3()),
-        20,
-        new C.Cartesian3()
-      );
-      return C.Cartesian3.add(personPosition, up, new C.Cartesian3());
-    }, false),
-    ellipsoid: {
-      radii: new C.Cartesian3(0.2, 0.2, 0.2),
-      material: C.Color.WHITE,
-    },
-  });
-  const indicator = viewer.entities.add({
-    name: "indicator",
-    polyline: {
-      positions: new C.CallbackProperty(() => {
-        const nextEdge = nextEdges[iNextEdge];
-        const tail = nextEdge[0];
-        const head = fadd(tail, getEdgeVec(nextEdge)).concat(nextEdge[0][2]);
-        return [getC3(tail, GEOID + 10), getC3(head, GEOID + 10)];
-      }, false),
-      width: 5,
-      material: new C.PolylineOutlineMaterialProperty({
-        color: C.Color.ORANGE,
-        outlineWidth: 2,
-        outlineColor: C.Color.BLACK,
-      }),
-    },
-  });
-
-  document.addEventListener("keydown", (event) => {
-    switch (event.code) {
-      case "KeyA":
-      case "ArrowLeft":
-        iNextEdge = iNextEdge > 0 ? iNextEdge - 1 : nextEdges.length - 1;
-        // console.log(iNextEdge, nextEdges.length);
-        break;
-      case "KeyD":
-      case "ArrowRight":
-        iNextEdge = iNextEdge < nextEdges.length - 1 ? iNextEdge + 1 : 0;
-        // console.log(iNextEdge, nextEdges.length);
-        break;
-      // case "Space":
-      //   fromBehind = !fromBehind;
-      //   if (fromBehind) {
-      //     const p = anchor.position.getValue();
-      //     const diff = C.Cartesian3.subtract(viewer.camera.position, p, new C.Cartesian3());
-      //     const mat = C.Matrix4.inverseTransformation(C.Transforms.eastNorthUpToFixedFrame(p), new C.Matrix4());
-      //     anchor.viewFrom = C.Matrix4.multiplyByPointAsVector(mat, diff, new C.Cartesian3());
-      //     viewer.trackedEntity = anchor;
-      //   } else {
-      //     viewer.trackedEntity = undefined;
-      //   }
-      //   break;
-      default:
-    }
-  });
-
-  viewer.scene.preUpdate.addEventListener((scene, time) => {
-    const dt = C.JulianDate.secondsDifference(time, lastTime);
-    personDistance += dt * personSpeed;
-    const { coords, distances } = nw.getEdgeData(...personOnEdge);
-    if (tail(distances) <= personDistance) {
-      personOnEdge = nextEdges[iNextEdge];
-      personPosition = getC3(personOnEdge[0], GEOID);
-      personDistance = 0;
-      [nextEdges, iNextEdge] = getNextEdges(personOnEdge);
-      indicator.polyline.material.color = nextEdges.length >= 2 ? C.Color.ORANGE : C.Color.DODGERBLUE;
-    } else {
-      for (const [c1, c2, d1, d2] of zip(
-        coords.slice(0, -1),
-        coords.slice(1),
-        distances.slice(0, -1),
-        distances.slice(1)
-      )) {
-        if (d1 <= personDistance && personDistance < d2) {
-          const r = (personDistance - d1) / (d2 - d1);
-          const c = getCoord(c1, c2, r);
-          personPosition = C.Cartesian3.fromDegrees(c[0], c[1], c[2] + GEOID + 5);
-        }
-      }
-    }
-    if (fromBehind) {
-      viewer.trackedEntity = undefined;
-      const p = anchor.position.getValue();
-      const diff = C.Cartesian3.subtract(viewer.camera.position, p, new C.Cartesian3());
-      const diff2 = C.Cartesian3.multiplyByScalar(
-        C.Cartesian3.normalize(diff, new C.Cartesian3()),
-        Math.min(C.Cartesian3.magnitude(diff), 300),
-        new C.Cartesian3()
-      );
-      const mat = C.Matrix4.inverseTransformation(C.Transforms.eastNorthUpToFixedFrame(p), new C.Matrix4());
-      anchor.viewFrom = C.Matrix4.multiplyByPointAsVector(mat, diff2, new C.Cartesian3());
-      viewer.trackedEntity = anchor;
-    }
-    lastTime = time;
-  });
 });
 
 window._viewer = viewer;
