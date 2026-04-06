@@ -63,6 +63,7 @@ viewer.shadowMap.maximumDistance = 1000.0;
 viewer.shadowMap.size = 4096;
 viewer.clock.multiplier = 1;
 viewer.clock.shouldAnimate = true;
+viewer.clock.currentTime.secondsOfDay = (8 + 3) * 3600;
 // viewer.scene.fog.density = 0.001;
 // viewer.scene.fog.screenSpaceErrorFactor = 4;
 // viewer.scene.debugShowFramesPerSecond = true;
@@ -70,21 +71,6 @@ viewer.clock.shouldAnimate = true;
 // viewer.extend(C.viewerCesium3DTilesInspectorMixin);
 
 viewer.scene.primitives.add(new C.Cesium3DTileset({ url: TILESET_FEATURES_URL }));
-
-viewer.scene.globe.depthTestAgainstTerrain = true;
-viewer.scene.globe.enableLighting = true;
-viewer.scene.globe.maximumScreenSpaceError = 1; // if more refine terrain
-viewer.shadowMap.maximumDistance = 1000.0;
-// viewer.shadowMap.softShadows = true;
-viewer.shadowMap.size = 4096;
-viewer.clock.multiplier = 1;
-viewer.clock.shouldAnimate = true;
-viewer.clock.currentTime.secondsOfDay = (8 + 3) * 3600;
-// viewer.scene.fog.density = 0.001;
-// viewer.scene.fog.screenSpaceErrorFactor = 4;
-// viewer.scene.debugShowFramesPerSecond = true;
-// viewer.extend(C.viewerCesiumInspectorMixin);
-// viewer.extend(C.viewerCesium3DTilesInspectorMixin);
 
 const presetCameras = getPresetCameras(viewer);
 viewer.camera.setView(presetCameras.default);

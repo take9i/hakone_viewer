@@ -17,7 +17,10 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { grey } from "@mui/material/colors";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { viewer, presetCameras } from "./viewer.js";
+
+const appTheme = createTheme();
 
 const Locator = ({ viewer, presetCameras }) => {
   const [location, setLocation] = useState("default");
@@ -144,6 +147,7 @@ const Player = ({ viewer }) => {
 
 const App = () => {
   return (
+    <ThemeProvider theme={appTheme}>
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <div id="top-bar">
         <Locator viewer={viewer} presetCameras={presetCameras} />
@@ -155,6 +159,7 @@ const App = () => {
         <Player viewer={viewer} />
       </div>
     </LocalizationProvider>
+    </ThemeProvider>
   );
 };
 
