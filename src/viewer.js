@@ -75,8 +75,8 @@ viewer.scene.primitives.add(new C.Cesium3DTileset({ url: TILESET_FEATURES_URL })
 const presetCameras = getPresetCameras(viewer);
 viewer.camera.setView(presetCameras.default);
 
-/** 試験配置: public/models/house/house_a.glb（箱根湯本付近・地形クランプ） */
-const HOUSE_MODEL_URI = "/models/house/house_a.glb";
+/** 試験配置: public/models/house/house_a.glb（箱根湯本付近・地形クランプ）。GitHub Pages では BASE_URL 必須 */
+const HOUSE_MODEL_URI = `${import.meta.env.BASE_URL}models/house/house_a.glb`;
 // 東 50 m 後の地点から、さらに北へ約 50 m
 const houseLon = 139.106355;
 const houseLat = 35.233029;
